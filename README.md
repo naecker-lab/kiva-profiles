@@ -1,6 +1,7 @@
 ## Getting started
 
-Run `python srapeProfiles.py URLs.txt`.
+- Run `bash ./install_packages.sh `
+- Run `python srapeProfiles.py URLs.txt`
 
 ## Contributors
 
