@@ -1,67 +1,107 @@
 import requests
+import lxml 
 import bs4
 import pdfcrowd
 import subprocess
+from urllib import request
+
 import sys
 import os
 from selenium import webdriver
 from bs4 import BeautifulSoup
 import re
 
-bJeff          = True
-bGenerateImage = False
-
 ## Get the html code of webpage and convert into 'Beautiful Soup' element for parsing
+driver_location = r"G:\dev\chromedriver\chromedriver"
+'''
+options = webdriver.ChromeOptions()
+options.add_argument('--ignore-certificate-errors')
+options.add_argument("--test-type")
+options.add_argument("--disable-notifications")
+'''
+#driver = webdriver.Chrome(driver_location)
+
 def access_source_code(url):
-	if bJeff:
-		chrome_driver_binary = "/Users/jnaecker/Downloads/chromedriver"
-	else:
-		chrome_driver_binary = "/Users/danbjork/Downloads/chromedriver"
-	
-	options = webdriver.ChromeOptions()
-	if bJeff:
-		options.binary_location = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-	else:
-		options.binary_location = "/Applications/Chrome.app/Contents/MacOS/Google Chrome"
-	
-	browser = webdriver.Chrome(chrome_driver_binary, chrome_options=options)
-	webpage = "https://www.kiva.org/lend/" + str(url)
-	browser.get(webpage)
-	html = browser.page_source
-	soup = BeautifulSoup(html,"lxml")
-	return soup 
+    url = f"https://www.kiva.org/lend/{url}"
+    response = request.urlopen(url)
+    #html = response.content
+    #(driver.page_source).encode('utf-8')
+    #soup = BeautifulSoup(response,"lxml").encode("utf-8")
+    soup = BeautifulSoup(response, 'lxml')
+    soup.prettify('utf-8')
+    return soup 
+
 
 ## Function removes extra line-breaks, header and footer of page 
 def clean_up(page):
-	question_action = page.find('div', attrs={'class': 'full-width-green-bar'})
-	question_action.clear()
-	
-	for x in page.findAll("div","xbLegacyNav"):
-		x.decompose()
-	
-	line = page.find('section', {'class': 'more-loan-info'})
-	if page.find('section', {'class': 'more-loan-info'}) is not None: 
-	    line = page.find('section', {'class': 'more-loan-info'}).find_previous_sibling('hr')
-	    if line is not None:
-	        line.decompose()
-	
-	line2 = page.find('section', {'class': 'lenders-teams'})
-	if page.find('section', {'class': 'lenders-teams'}) is not None: 
+    page.find('div', {'class': 'full-width-green-bar'}).decompose()
+    for x in page.findAll("div","xbLegacyNav"):
+        x.decompose()
+
+    #remove the 'More information about this loan' part 
+    try:
+        page.find('section', {'class': 'more-loan-info'}).decompose()
+        page.find('section', {'class': 'more-loan-info'}).find_previous_sibling('hr').decompose()
+    except:
+        pass
+
+    #Remove the 'This loan is special because..' part 
+    '''
+    try:
+        page.find('section', {'class': 'why-special'}).decompose()
+        page.find('section', {'class': 'why-special'}).find_previous_sibling('hr').decompose()
+    except:
+        pass
+    '''
+    #Remove the 'A loan of xxx helped a member...' part 
+    #page.find('meta', {'property':'og:description'}).decompose()
+    page.find(content=re.compile(r'^A loan of')).decompose()
+    
+    
+    '''
+    line2 = page.find('section', {'class': 'lenders-teams'})
+    if page.find('section', {'class': 'lenders-teams'}) is not None: 
 	    line2 = page.find('section', {'class': 'lenders-teams'}).find_previous_sibling('hr')
 	    if line2 is not None:
 	        line2.decompose()
-	    
+    return page 
+    '''
+    #Removes the 'Lenders and lending teams' part
+    try:
+        page.find('section', {'class': 'lenders-teams'}).decompose()
+        page.find('section', {'class': 'lenders-teams'}).find_previous_sibling('hr').decompose()
+    except:
+        pass
+  
+    '''
 	line3 = page.find('section', {'class': 'country-info'})
 	if page.find('section', {'class': 'country-info'}) is not None: 
 	    line3 = page.find('section', {'class': 'country-info'}).find_previous_sibling('hr')
 	    if line3 is not None:
 	        line3.decompose()
-	
-	line4 = page.find('section', {'class': 'loan-tags'})
-	if page.find('section', {'class': 'loan-tags'}) is not None: 
-	    line4 = page.find('section', {'class': 'loan-tags'}).find_previous_sibling('hr')
-	    if line4 is not None:
-	        line4.decompose()
+
+    '''
+    #Removes country information 
+    try:
+        page.find('section', {'class': 'country-info'}).decompose()
+        page.find('section', {'class': 'country-info'}).find_previous_sibling('hr').decompose()
+    except:
+        pass
+    
+    #Removes loan tags 
+    try:
+        page.find('section', {'class': 'loan-tags'}).decompose()
+        page.find('section', {'class': 'loan-tags'}).find_previous_sibling('hr').decompose()
+    except:
+        pass
+
+    #Removes the photo and text line about translation
+    try:
+        page.find('section', {'class': 'loan-translation ac-container'}).decompose()
+    except:
+        pass
+
+    return page
 
 
 def capture_top_right(page):
@@ -113,15 +153,14 @@ def capture_bottom_left(page):
 	    tags_text.clear()
 	
 	lenders = page.find('section', attrs={'class': 'lenders-teams'})
-	lenders.clear()
+	lenders.clear() 
 	
 	country_info = page.find('section', attrs={'class': 'country-info'})
 	country_info.clear()
-	
+
 	return
 
-
-def generate_output(url,page, bGenerateImage):
+def generate_output(url,page):
 	s = str(url)
 	fl = '%s.html' % str(url)  
 	di = os.getcwd()
@@ -130,6 +169,7 @@ def generate_output(url,page, bGenerateImage):
 	with open(final, "w") as file:
 		file.write(str(page))
 	
+	'''
 	if bGenerateImage: ## Use pdfcrowd API to convert html to png output 
 		client = pdfcrowd.HtmlToImageClient('danbjork', 'b36c2753c910a1b758fbf6409ed06310')
 		client.setUseHttp(True)
@@ -137,7 +177,7 @@ def generate_output(url,page, bGenerateImage):
 		client = client.setScreenshotHeight(1250)
 		client.convertFileToFile(final, '%s.png' % str(url))
 	return
-
+	'''
 
 def extract_loanID_from_URL( x ):
 	m = re.search('^http(s)?://www.kiva.org/lend/(\\d+$)', x)
@@ -162,5 +202,4 @@ for nLoanID in anLoanIDs:
 	capture_bottom_right(webpage)
 	extend_text(webpage)
 	capture_bottom_left(webpage)
-	generate_output(nLoanID, webpage, bGenerateImage)
-
+	generate_output(nLoanID, webpage)
