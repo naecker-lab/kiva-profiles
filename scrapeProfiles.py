@@ -121,7 +121,7 @@ def capture_bottom_left(page):
         pass
     
     try:
-        country_info = page.find('section', attrs={'class': 'country-info'}).clear()
+        find('section', attrs={'class': 'country-info'}).clear()
     except:
         pass
     
