@@ -11,22 +11,10 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import re
 
-## Get the html code of webpage and convert into 'Beautiful Soup' element for parsing
-driver_location = r"G:\dev\chromedriver\chromedriver"
-'''
-options = webdriver.ChromeOptions()
-options.add_argument('--ignore-certificate-errors')
-options.add_argument("--test-type")
-options.add_argument("--disable-notifications")
-'''
-#driver = webdriver.Chrome(driver_location)
 
 def access_source_code(url):
     url = f"https://www.kiva.org/lend/{url}"
     response = request.urlopen(url)
-    #html = response.content
-    #(driver.page_source).encode('utf-8')
-    #soup = BeautifulSoup(response,"lxml").encode("utf-8")
     soup = BeautifulSoup(response, 'lxml')
     soup.prettify('utf-8')
     return soup 
@@ -45,27 +33,11 @@ def clean_up(page):
     except:
         pass
 
-    #Remove the 'This loan is special because..' part 
-    '''
-    try:
-        page.find('section', {'class': 'why-special'}).decompose()
-        page.find('section', {'class': 'why-special'}).find_previous_sibling('hr').decompose()
-    except:
-        pass
-    '''
+   
     #Remove the 'A loan of xxx helped a member...' part 
     #page.find('meta', {'property':'og:description'}).decompose()
-    page.find(content=re.compile(r'^A loan of')).decompose()
+    #page.find(content=re.compile(r'^A loan of')).decompose()
     
-    
-    '''
-    line2 = page.find('section', {'class': 'lenders-teams'})
-    if page.find('section', {'class': 'lenders-teams'}) is not None: 
-	    line2 = page.find('section', {'class': 'lenders-teams'}).find_previous_sibling('hr')
-	    if line2 is not None:
-	        line2.decompose()
-    return page 
-    '''
     #Removes the 'Lenders and lending teams' part
     try:
         page.find('section', {'class': 'lenders-teams'}).decompose()
@@ -73,14 +45,6 @@ def clean_up(page):
     except:
         pass
   
-    '''
-	line3 = page.find('section', {'class': 'country-info'})
-	if page.find('section', {'class': 'country-info'}) is not None: 
-	    line3 = page.find('section', {'class': 'country-info'}).find_previous_sibling('hr')
-	    if line3 is not None:
-	        line3.decompose()
-
-    '''
     #Removes country information 
     try:
         page.find('section', {'class': 'country-info'}).decompose()
@@ -141,26 +105,29 @@ def extend_text(page):
 	search['class'] = 'columns'
 
 def capture_bottom_left(page):
-	
-	x = page.find('div', {'aria-controls': 'ac-more-loan-info-body'})
-	if x is not None:
-		temp = x.find('h2')
-		if temp is not None:
-			temp.clear()
-	
-	tags_text = page.find('div', {'class': 'ac-title-text'})
-	if tags_text is not None:
-	    tags_text.clear()
-	
-	lenders = page.find('section', attrs={'class': 'lenders-teams'})
-	lenders.clear() 
-	
-	country_info = page.find('section', attrs={'class': 'country-info'})
-	country_info.clear()
+    try:
+        page.find('div', {'aria-controls': 'ac-more-loan-info-body'}).find('h2').clear()
+    except:
+        pass 
+    
+    try:
+        page.find('div', {'class': 'ac-title-text'}).clear()
+    except:
+        pass
+    
+    try:
+        page.find('section', attrs={'class': 'lenders-teams'}).clear()
+    except:
+        pass
+    
+    try:
+        country_info = page.find('section', attrs={'class': 'country-info'}).clear()
+    except:
+        pass
+    
+    return
 
-	return
-
-def generate_output(url,page):
+def generate_output(url,page, bGenerateImage):
 	s = str(url)
 	fl = '%s.html' % str(url)  
 	di = os.getcwd()
@@ -168,16 +135,13 @@ def generate_output(url,page):
 	
 	with open(final, "w") as file:
 		file.write(str(page))
-	
-	'''
+
 	if bGenerateImage: ## Use pdfcrowd API to convert html to png output 
 		client = pdfcrowd.HtmlToImageClient('danbjork', 'b36c2753c910a1b758fbf6409ed06310')
 		client.setUseHttp(True)
 		client.setOutputFormat('png')
 		client = client.setScreenshotHeight(1250)
 		client.convertFileToFile(final, '%s.png' % str(url))
-	return
-	'''
 
 def extract_loanID_from_URL( x ):
 	m = re.search('^http(s)?://www.kiva.org/lend/(\\d+$)', x)
@@ -202,4 +166,4 @@ for nLoanID in anLoanIDs:
 	capture_bottom_right(webpage)
 	extend_text(webpage)
 	capture_bottom_left(webpage)
-	generate_output(nLoanID, webpage)
+	generate_output(nLoanID, webpage, True)
