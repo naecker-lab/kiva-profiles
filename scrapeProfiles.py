@@ -11,7 +11,7 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import re
 
-
+## Make HTTP request for the url, convert response into 'BeautifulSoup' object for parsing
 def access_source_code(url):
     url = f"https://www.kiva.org/lend/{url}"
     response = request.urlopen(url)
