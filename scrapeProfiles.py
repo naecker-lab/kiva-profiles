@@ -11,61 +11,68 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 import re
 
-## Make HTTP request for the url, convert response into 'BeautifulSoup' object for parsing
 def access_source_code(url):
-    url = f"https://www.kiva.org/lend/{url}"
-    response = request.urlopen(url)
-    soup = BeautifulSoup(response, 'lxml')
-    soup.prettify('utf-8')
-    return soup 
+	url = f"https://www.kiva.org/lend/{url}"
+	response = request.urlopen(url)
+	soup = BeautifulSoup(response, 'lxml')
+	soup = BeautifulSoup((str(soup).replace('<br/>','\n')), 'lxml') #removes line breaks in BS element so everything fits in image 
+	soup.prettify('utf-8')
+	return soup 
 
 
 ## Function removes extra line-breaks, header and footer of page 
 def clean_up(page):
-    page.find('div', {'class': 'full-width-green-bar'}).decompose()
-    for x in page.findAll("div","xbLegacyNav"):
-        x.decompose()
-
-    #remove the 'More information about this loan' part 
-    try:
-        page.find('section', {'class': 'more-loan-info'}).decompose()
-        page.find('section', {'class': 'more-loan-info'}).find_previous_sibling('hr').decompose()
-    except:
-        pass
-
-   
-    #Remove the 'A loan of xxx helped a member...' part 
-    #page.find('meta', {'property':'og:description'}).decompose()
-    #page.find(content=re.compile(r'^A loan of')).decompose()
+	page.find('div', {'class': 'full-width-green-bar'}).decompose()
+	for x in page.findAll("div","xbLegacyNav"):
+		x.decompose()
+	
+	#remove the 'More information about this loan' part 
+	try:
+		page.find('section', {'class': 'more-loan-info'}).decompose()
+		page.find('section', {'class': 'more-loan-info'}).find_previous_sibling('hr').decompose()
+	except:
+		pass
+	
+	#Remove the 'A loan of xxx helped a member...' part 
+	try:
+		page.find('div', {'class':'loan-use'}).decompose()
+		page.find('div', {'class': 'loan-use'}).find_previous_sibling('hr').decompose()
+	except:
+		pass
     
-    #Removes the 'Lenders and lending teams' part
-    try:
-        page.find('section', {'class': 'lenders-teams'}).decompose()
-        page.find('section', {'class': 'lenders-teams'}).find_previous_sibling('hr').decompose()
-    except:
-        pass
+	#Removes the 'Lenders and lending teams' part
+	try:
+		page.find('section', {'class': 'lenders-teams'}).decompose()
+		page.find('section', {'class': 'lenders-teams'}).find_previous_sibling('hr').decompose()
+	except:
+		pass
   
     #Removes country information 
-    try:
-        page.find('section', {'class': 'country-info'}).decompose()
-        page.find('section', {'class': 'country-info'}).find_previous_sibling('hr').decompose()
-    except:
-        pass
+	try:
+		page.find('section', {'class': 'country-info'}).decompose()
+		page.find('section', {'class': 'country-info'}).find_previous_sibling('hr').decompose()
+	except:
+		pass
     
     #Removes loan tags 
-    try:
-        page.find('section', {'class': 'loan-tags'}).decompose()
-        page.find('section', {'class': 'loan-tags'}).find_previous_sibling('hr').decompose()
-    except:
-        pass
+	try:
+		page.find('section', {'class': 'loan-tags'}).decompose()
+		page.find('section', {'class': 'loan-tags'}).find_previous_sibling('hr').decompose()
+	except:
+		pass
 
     #Removes the photo and text line about translation
-    try:
-        page.find('section', {'class': 'loan-translation ac-container'}).decompose()
-    except:
-        pass
+	try:
+		page.find('section', {'class': 'loan-translation ac-container'}).decompose()
+	except:
+		pass
 
-    return page
+	try:
+		page.find('p', {'class': 'borrowers-list'}).decompose()
+	except:
+		pass
+
+	return page
 
 
 def capture_top_right(page):
@@ -121,7 +128,7 @@ def capture_bottom_left(page):
         pass
     
     try:
-        find('section', attrs={'class': 'country-info'}).clear()
+        page.find('section', attrs={'class': 'country-info'}).clear()
     except:
         pass
     
