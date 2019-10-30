@@ -482,6 +482,8 @@ def get_detail(loanID):
         #generate thumbnails using headless part 
         options = FirefoxOptions()
         options.add_argument("--headless")
+        options.add_argument("--width=2560") # use large window so page is not cut off
+        options.add_argument("--height=1920")
         
         driver_headless = webdriver.Firefox(options=options,executable_path=geckodriver_location)
         
