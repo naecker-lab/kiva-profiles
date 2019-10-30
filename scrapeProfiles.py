@@ -544,7 +544,7 @@ except IndexError:
 #for each loanID, generate cleaned_html, full_image, thumbnail
 for loanID in anLoanIDs:
     try:
-        # get_thumbnail(loanID) 
+        get_thumbnail(loanID) 
         get_detail(loanID)
     except:
         pass
