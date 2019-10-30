@@ -4,236 +4,296 @@ import bs4
 import pdfcrowd
 import subprocess
 from urllib import request
-
 import sys
 import os
 from selenium import webdriver
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.common.action_chains import ActionChains
 from bs4 import BeautifulSoup
 import re
+import time
+from PIL import Image
+from io import BytesIO
 
-def access_source_code(url):
-	url = f"https://www.kiva.org/lend/{url}"
-	response = request.urlopen(url)
-	soup = BeautifulSoup(response, 'lxml')
-	try:
-		soup = BeautifulSoup((str(soup).replace('<br/>','\n')), 'lxml') #removes line breaks in BS element so everything fits in image 
-	except:
-		soup = soup
-	soup.prettify('utf-8')
-	return soup 
+#locations of executables of webdrivers
+chromedriver_location = r"G:\dev\chromedriver\chromedriver"
+geckodriver_location = r'G:\dev\geckodriver\geckodriver.exe'
 
+def get_html_and_thumbnail(loanID):
+    options = FirefoxOptions()
+    options.add_argument('--ignore-certificate-errors')
+    options.add_argument("--test-type")
+    options.add_argument("--disable-notifications")
 
-## Function removes extra line-breaks, header and footer of page 
-def clean_up(page):
-	
-	try:
-		page.find('div', {'class': 'full-width-green-bar'}).decompose()
-	except:
-		pass
+    driver = webdriver.Firefox(options=options, executable_path=geckodriver_location)
+    driver.get(f'https://www.kiva.org/lend/{loanID}')
+    time.sleep(5)
 
-	try:
-		for x in page.findAll("div","xbLegacyNav"):
-			x.decompose()
-	except:
-		pass
-	
-	#remove the 'More information about this loan' part 
-	
-	try:
-		page.find('section', {'class': 'more-loan-info'}).decompose()
-		page.find('section', {'class': 'more-loan-info'}).find_previous_sibling('hr').decompose()
-	except:
-		pass
+    #close the cookies notification:
+    driver.find_element_by_class_name('close-button').click()
 
-	#Remove the 'A loan of xxx helped a member...' part 
-	try:
-		page.find('div', {'class':'loan-use'}).decompose()
-		page.find('div', {'class': 'loan-use'}).find_previous_sibling('hr').decompose()
-	except:
-		pass
-
-	#Removes the 'Lenders and lending teams' part
-	try:
-		page.find('section', {'class': 'lenders-teams'}).decompose()
-		page.find('section', {'class': 'lenders-teams'}).find_previous_sibling('hr').decompose()
-	except:
-		pass
-
-    #Removes country information 
-	try:
-		page.find('section', {'class': 'country-info'}).decompose()
-		page.find('section', {'class': 'country-info'}).find_previous_sibling('hr').decompose()
-	except:
-		pass
-
-    #Removes loan tags 
-	try:
-		page.find('section', {'class': 'loan-tags'}).decompose()
-		page.find('section', {'class': 'loan-tags'}).find_previous_sibling('hr').decompose()
-	except:
-		pass
-
-    #Removes the photo and text line about translation
-	try:
-		page.find('section', {'class': 'loan-translation ac-container'}).decompose()
-	except:
-		pass
-	
-	try:
-		page.find('p', {'class': 'borrowers-list'}).decompose()
-	except:
-		pass
-	'''
-	#add image back to html
-	try:
-		#borrower_image = page.find('div', {'class': 'row loan-image-info-row'})
-		borrower_image = page.findAll('img')
-	except:
-		pass 
-	return borrower_image
-	'''
-	#removes all line breaks
-	try:
-		page.findAll('hr').decompose()
-	except:
-		pass
-
-	#genarate thumbnails 
-	return page
-
-def cleanUp_for_thumbnail(page):
-	try:
-		page = page.find('div', attrs={'class': 'borrower-profile-pieces'}).clear()
-	except:
-		pass
-	return page 
-
-
-def capture_top_right(page):
-	lender_count = page.find('a', attrs={'class': 'lender-count black-underlined'})
-	lender_count.clear()
-	
-	status = page.find('div', attrs={'class': 'current-status-meter'})
-	status.clear()
-	
-	lender_action = page.find('div', attrs={'class': 'show-for-large-up lend-action'})
-	lender_action.clear()
-	
-	return
-
-def capture_bottom_right(page):
-	try:
-		page.find('div', attrs={'class': 'right-content columns'}).clear()
-	except:
-		pass
-	
-	try:
-		page.find('section', attrs={'class': 'loan-details'}).clear()
-	except:
-		pass
-	
-	try:
-		for e in page.findAll("div","stat"):
-			e.clear()
-	except:
-		pass
-	return
-
-def extend_text(page):
-	div_page_content = page.find("div", { "class" : "borrower-profile-pieces" })
-	button_active = page.new_tag('style', type='text/css')
-	div_page_content.attrs['style'] = 'background: #FFF'
-	
-	div_page_content = page.find("div", { "class" : "right-content columns" })
-	button_active = page.new_tag('style', type='text/css')
-	try:
-		div_page_content.attrs['style'] = 'background-color: white'
-	except:
-		pass
-	try:
-		search = page.find("div", { "class" : "left-content columns" })
-		search['class'] = 'columns'
-	except:
-		pass
-
-def capture_bottom_left(page):
-    try:
-        page.find('div', {'aria-controls': 'ac-more-loan-info-body'}).find('h2').clear()
+    #remove lenders-teams
+    try: 
+        element1 = driver.find_element_by_class_name('lenders-teams')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element1)
     except:
         pass 
-    
+
+    #remove loan endorser
     try:
-        page.find('div', {'class': 'ac-title-text'}).clear()
+        element1b = driver.find_element_by_class_name('endorser')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element1b)
+    except:
+        pass 
+
+    #remove loan endorser
+    try:
+        element1c = driver.find_element_by_class_name('comments-and-updates')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element1c)
+    except:
+        pass 
+
+    #remove status meter
+    try:
+        element1d = driver.find_element_by_class_name('current-status-meter')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element1d)
+    except:
+        pass 
+
+    #remove green bar header
+    try:
+        element2 = driver.find_element_by_class_name('full-width-green-bar')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element2)
+    except:
+        pass 
+
+    #also removes header
+    try:
+        element3 = driver.find_element_by_class_name('xbLegacyNav')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element3)
+    except:
+        pass 
+
+    try:
+        element4 = driver.find_element_by_class_name('more-loan-info')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element4)
+    except:
+        pass 
+
+    try:
+        element5 = driver.find_element_by_xpath('//*[@id="main"]/div[6]/div[2]')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element5)
+    except:
+        pass 
+
+    #remove footer
+    try:
+        element9 = driver.find_element_by_xpath('//*[@id="lend"]/div[5]')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element9)
+    except:
+        pass 
+
+    #remove country-info 
+    try:
+        element10 = driver.find_element_by_xpath('//*[@id="country-section"]')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element10)
     except:
         pass
-    
+    #remove loan-tags 
     try:
-        page.find('section', attrs={'class': 'lenders-teams'}).clear()
+        element11 = driver.find_element_by_class_name('loan-tags')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element11)
     except:
         pass
-    
+
+    #remove 'translated by ...'
     try:
-        page.find('section', attrs={'class': 'country-info'}).clear()
+        element12 = driver.find_element_by_xpath('//*[@id="ac-loan-story-body"]/section[2]')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element12)
     except:
-        pass
+        pass 
+
+    try:
+        element13 = driver.find_element_by_xpath('//*[@id="ac-loan-story-body"]/p')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, element13)
+    except:
+        pass 
+
+    #remove bottom right part for loan details 
+    def capture_bottom_right(page):
+        try:
+            page.find('div', attrs={'class': 'right-content columns'}).clear()
+        except:
+            pass
+        
+        try:
+            page.find('section', attrs={'class': 'loan-details'}).clear()
+        except:
+            pass
+        
+        try:
+            for e in page.findAll("div","stat"):
+                e.clear()
+        except:
+            pass
+        return 
+
+    def extend_text(page):
+        div_page_content = page.find("div", { "class" : "borrower-profile-pieces" })
+        button_active = page.new_tag('style', type='text/css')
+        div_page_content.attrs['style'] = 'background: #FFF'
+        
+        div_page_content = page.find("div", { "class" : "right-content columns" })
+        button_active = page.new_tag('style', type='text/css')
+        try:
+            div_page_content.attrs['style'] = 'background-color: white'
+        except:
+            pass
+        try:
+            search = page.find("div", { "class" : "left-content columns" })
+            search['class'] = 'columns'
+        except:
+            pass
+
+    #convert page to BS element for further cleaning up
+    page = driver.page_source
+    soup = BeautifulSoup(page, 'lxml')
+    soup.prettify()
+    capture_bottom_right(soup)
+    extend_text(soup)
+
+    try:
+        (soup.find('section', {'class': 'loan-description'}).find('p')).replaceWith((soup.find('section', {'class': 'loan-description'}).find('p')).get_text())
+    except:
+        pass 
+
+
+    #removes current status of loan part 
+    try:
+        soup.find('div', {'class': 'current-status-meter'}).clear()
+    except:
+        pass 
+
+    #remove lend-action-holder
+    try:
+        soup.find('div', {'class': 'lend-action-holder'}).clear()
+    except:
+        pass 
+
+    #removes the 'a loan of zzz...' part 
+    try:
+        soup.find('div', {'class': 'small-12 columns'}).clear()
+    except:
+        pass 
+
+    try:
+        soup.find('p', {'class': 'ac-title black-underlined text-center show-previous-loan-details'}).clear()
+    except:
+        pass 
+
+    if os.path.exists(str(f'{str(os.getcwd())}/cleaned_html')) == False:
+        os.makedirs('cleaned_html')
+        with open(f'{str(os.getcwd())}/cleaned_html/{str(loanID)}.html', 'w+', encoding='utf-8') as page_source:
+            page_source.write(str(soup))
+    else:
+        with open(f'{str(os.getcwd())}/cleaned_html/{str(loanID)}.html', 'w+', encoding='utf-8') as page_source:
+            page_source.write(str(soup))
     
-    return
+    #cleaned_html to image
+    try:
+        client = pdfcrowd.HtmlToImageClient('jnaecker', 'af46416a5a33dd6f2d0b9656a89210e8')
+        client.setUseHttp(True)
+        client.setOutputFormat('png')
+        client = client.setScreenshotHeight(1250)
+        #save to file
+        cleaned_html = f'{str(os.getcwd())}/cleaned_html/{str(loanID)}.html'
+        if os.path.exists(f'{str(os.getcwd())}/full_image') == False:
+            os.makedirs('full_image')
+            client.convertFileToFile(cleaned_html, str(f'{str(os.getcwd())}/full_image/{loanID}.png'))
+        else:
+            client.convertFileToFile(cleaned_html, f'{str(os.getcwd())}/full_image/{str(loanID)}.png')
+    except:
+        pass 
+        
+    driver.quit()
 
+    #generate thumbnails using headless part 
+    options = FirefoxOptions()
+    options.add_argument("--headless")
 
-def generate_output(loanID,page, bGenerateImage):
-	s = str(loanID)
-	html_file = '%s.html' % str(loanID)  
-	current_dir = os.getcwd()
-	working_dir = os.path.join(current_dir,html_file)
-	#os.mkdir('thumbnails') 
-	#thumbnail_dir = os.path.join(current_dir,r'thumbnails')
-	
-	with open(working_dir, "w+") as file:
-		file.write(str(page))
+    driver_headless = webdriver.Firefox(options=options,executable_path=geckodriver_location)
 
-	if bGenerateImage: ## Use pdfcrowd API to convert html to png output 
-		client = pdfcrowd.HtmlToImageClient('danbjork', 'b36c2753c910a1b758fbf6409ed06310')
-		client.setUseHttp(True)
-		client.setOutputFormat('png')
-		client = client.setScreenshotHeight(1250)
-		client.convertFileToFile(working_dir, '%s.png' % str(loanID))
+    driver_headless.get(f'file:///{str(os.getcwd())}/cleaned_html/{str(loanID)}.html')
+    time.sleep(10)
 
-def generate_thumbnail(loanID, page):
-	s = str(loanID)
-	html_file = '%s.html' % str(loanID)  
-	current_dir = os.getcwd()
-	working_dir = os.path.join(current_dir,html_file)
+    body = driver_headless.find_element_by_css_selector('.loan-image-info-row')
+    body_size = body.size
+    body_location = body.location
 
-	if os.path.exists('./thumbnails') == False:
-		os.makedirs('thumbnails')
-		thumbnail_dir = os.path.join(f'{current_dir}/thumbnails', html_file)
-		with open(thumbnail_dir, 'w+') as thumbnail_file:
-			thumbnail_file.write(str(page))
-			
-		'''
-		client = pdfcrowd.HtmlToImageClient('danbjork', 'b36c2753c910a1b758fbf6409ed06310')
-		client.setUseHttp(True)
-		client.setOutputFormat('png')
-		client = client.setScreenshotHeight(1250)
-		client.convertFileToFile(thumbnail_dir, '%s.png' % str(loanID))
-		'''
-	else:
-		thumbnail_dir = os.path.join(f'{current_dir}/thumbnails', html_file)
-		with open(thumbnail_dir, 'w+') as thumbnail_file:
-			thumbnail_file.write(str(page))
+    body_screenshot = driver_headless.get_screenshot_as_png()
 
-		## Use pdfcrowd API to convert html to png output 
-		'''
-		client = pdfcrowd.HtmlToImageClient('danbjork', 'b36c2753c910a1b758fbf6409ed06310')
-		client.setUseHttp(True)
-		client.setOutputFormat('png')
-		client = client.setScreenshotHeight(1250)
-		client.convertFileToFile(thumbnail_dir, '%s.png' % str(loanID))
-		'''
+    left = body_location['x']
+    top = body_location['y']
 
+    right = left + body_size['width']
+    bottom = top + body_size['height']
+
+    im = Image.open(BytesIO(body_screenshot))
+    im = im.crop((left, top, right, bottom))
+
+    if os.path.exists(f'{str(os.getcwd())}/thumbnails') == False:
+        os.makedirs('thumbnails')
+        im.save(f'{str(os.getcwd())}/thumbnails/{str(loanID)}.png')
+    else: 
+        im.save(f'{str(os.getcwd())}/thumbnails/{str(loanID)}.png')
+    
+    driver_headless.quit()
+
+#read .txt file with URLs
 def extract_loanID_from_URL(x ):
 	m = re.search('^http(s)?://www.kiva.org/lend/(\\d+$)', x)
 	return m.group(2)
+
 try:
 	## Read file with URLs, one per line
 	url_file = sys.argv[1]
@@ -245,22 +305,9 @@ except IndexError:
 	## Ask for user-input in the form of space-separated url numbers
 	anLoanIDs = [extract_loanID_from_URL(x) for x in input("Enter space-separated urls: ").split()]
 
-## Run and generate output for each entered user 'url'
-for nLoanID in anLoanIDs:
-	webpage = access_source_code(nLoanID)
-	cleaned_page = clean_up(webpage)
-	capture_top_right(cleaned_page)
-	capture_bottom_right(cleaned_page)
-	extend_text(cleaned_page)
-	capture_bottom_left(cleaned_page)
-	generate_output(nLoanID, cleaned_page, False)
-
-for nLoanID in anLoanIDs:
-	webpage = access_source_code(nLoanID)
-	cleaned_page = clean_up(webpage)
-	capture_top_right(cleaned_page)
-	capture_bottom_right(cleaned_page)
-	extend_text(cleaned_page)
-	capture_bottom_left(cleaned_page)
-	cleanUp_for_thumbnail(cleaned_page)
-	generate_thumbnail(nLoanID,cleaned_page)
+#for each loanID, generate cleaned_html, full_image, thumbnail
+for loanID in anLoanIDs:
+    try: 
+        get_html_and_thumbnail(loanID)
+    except:
+        pass 
