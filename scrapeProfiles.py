@@ -15,6 +15,8 @@ import re
 import time
 from PIL import Image
 from io import BytesIO
+import pyautogui
+import platform
 
 #locations of executables of webdrivers
 chromedriver_location = r"G:\dev\chromedriver\chromedriver"
@@ -23,9 +25,24 @@ chromedriver_location = r"drivers/chromedriver"
 geckodriver_location = r"drivers/geckodriver"
 
 
-nDeltaPx = 70
+nDeltaPx                            = 70 # pixels to cut off of thumbnails
+bConvertThumbnailTextToPresentTense = True
+bSkipIfPresent                      = True
+
+nDelayBetweenLoanIDs = 60
 
 def get_thumbnail(loanID):
+    if bSkipIfPresent:
+        if os.path.exists(f'{str(os.getcwd())}/thumbnail_archive/{str(loanID)}.html') and \
+           os.path.exists(f'{str(os.getcwd())}/thumbnail_html/{str(loanID)}ma.html')  and \
+           os.path.exists(f'{str(os.getcwd())}/thumbnail_html/{str(loanID)}un.html')  and \
+           os.path.exists(f'{str(os.getcwd())}/thumbnail_png/{str(loanID)}ma.png')    and \
+           os.path.exists(f'{str(os.getcwd())}/thumbnail_png/{str(loanID)}un.png'):
+           print(f'Skipping thumbnail for processed loan {loanID}')
+           return False
+    
+    print(f'Capturing thumbnail for loan {loanID}')
+    
     print(f'Capturing loan {loanID}')
     options = FirefoxOptions()
     options.add_argument('--ignore-certificate-errors')
@@ -35,6 +52,25 @@ def get_thumbnail(loanID):
     driver = webdriver.Firefox(options=options, executable_path=geckodriver_location)
     driver.get(f'https://www.kiva.org/lend?queryString={loanID}&status=all')
     time.sleep(5)
+    
+    # save file and assets
+    if platform.system() == "Darwin":
+        pyautogui.hotkey('command', 's')
+    else:
+        pyautogui.hotkey('ctrl', 's')
+    
+    time.sleep(1)
+    if not os.path.exists(f'{str(os.getcwd())}/thumbnail_archive'):
+        os.makedirs('thumbnail_archive')
+    
+    pyautogui.typewrite(f'{str(os.getcwd())}/thumbnail_archive/')
+    pyautogui.hotkey('enter')
+    pyautogui.typewrite(str(loanID))
+    if platform.system() != "Darwin":
+        pyautogui.typewrite('.html')
+    
+    pyautogui.hotkey('enter')
+    
     
     #close the cookies notification:
     driver.find_element_by_class_name('close-button').click()
@@ -114,6 +150,25 @@ def get_thumbnail(loanID):
         """, el)
     except:
         pass
+
+    try:
+        el = driver.find_element_by_class_name('button-line')
+        driver.execute_script("""
+        var element = arguments[0];
+        element.parentNode.removeChild(element);
+        """, el)
+    except:
+        pass
+    
+    if bConvertThumbnailTextToPresentTense:
+        try:
+            el = driver.find_element_by_class_name('loan-card-2-use')
+            driver.execute_script("""
+            var element = arguments[0];
+            element.innerText = element.innerText.replace(' helped ', ' helps ');
+            """, el)
+        except:
+            pass
     
     # REMOVE MATCHING INDICATOR IF IT ALREADY EXISTS
     try:
@@ -134,7 +189,7 @@ def get_thumbnail(loanID):
     #     """, elementMatched)
     # except:
     #     pass
-    
+
     for bMatched in (False, True):
         cExtra = 'ma' if bMatched else 'un'
         if bMatched:
@@ -190,10 +245,20 @@ def get_thumbnail(loanID):
         driver_headless.quit()
     
     driver.quit()
+    return True
 
 
 def get_detail(loanID):
-    print(f'Capturing loan {loanID}')
+    if bSkipIfPresent:
+        if os.path.exists(f'{str(os.getcwd())}/detail_archive/{str(loanID)}.html') and \
+           os.path.exists(f'{str(os.getcwd())}/detail_html/{str(loanID)}ma.html')  and \
+           os.path.exists(f'{str(os.getcwd())}/detail_html/{str(loanID)}un.html')  and \
+           os.path.exists(f'{str(os.getcwd())}/detail_png/{str(loanID)}ma.png')    and \
+           os.path.exists(f'{str(os.getcwd())}/detail_png/{str(loanID)}un.png'):
+           print(f'Skipping detail for processed loan {loanID}')
+           return False
+    
+    print(f'Capturing detail for loan {loanID}')
     options = FirefoxOptions()
     options.add_argument('--ignore-certificate-errors')
     options.add_argument("--test-type")
@@ -202,6 +267,24 @@ def get_detail(loanID):
     driver = webdriver.Firefox(options=options, executable_path=geckodriver_location)
     driver.get(f'https://www.kiva.org/lend/{loanID}?minimal=false')
     time.sleep(5)
+    
+    # open 'Save as...' to save html and assets
+    if platform.system() == "Darwin":
+        pyautogui.hotkey('command', 's')
+    else:
+        pyautogui.hotkey('ctrl', 's')
+    
+    time.sleep(1)
+    if not os.path.exists(f'{str(os.getcwd())}/detail_archive'):
+        os.makedirs('detail_archive')
+    
+    pyautogui.typewrite(f'{str(os.getcwd())}/detail_archive/')
+    pyautogui.hotkey('enter')
+    pyautogui.typewrite(str(loanID))
+    if platform.system() != "Darwin":
+        pyautogui.typewrite('.html')
+    
+    pyautogui.hotkey('enter')
     
     #close the cookies notification:
     driver.find_element_by_class_name('close-button').click()
@@ -383,6 +466,7 @@ def get_detail(loanID):
             matchingIndicator.innerHTML = '<svg class="icon icon-match"><use xlink:href="#icon-match"></use></svg><span aria-describedby="tooltip-k2djrzq50" aria-haspopup="true" data-selector="tooltip-k2djrzq50" data-tooltip="" title="">Matching by a Kiva supporter</span>';
             var element = arguments[0];
             element.appendChild(matchingIndicator);
+            element.style = 'position: relative; transition: margin 0.3s ease-in-out 0s; margin-right: 0px; margin-left: 0px; margin-top: 0px; display: block;'; // remove margin
             """, element_imageFooter)
         
         
@@ -522,6 +606,7 @@ def get_detail(loanID):
         driver_headless.quit()
     
     driver.quit()
+    return True
 
 
 
@@ -541,11 +626,14 @@ except IndexError:
     ## Ask for user-input in the form of space-separated url numbers
     anLoanIDs = [extract_loanID_from_URL(x) for x in input("Enter space-separated urls: ").split()]
 
-#for each loanID, generate cleaned_html, full_image, thumbnail
+#for each loanID, generate detail, thumbnail
 for loanID in anLoanIDs:
-    try:
-        get_thumbnail(loanID) 
-        get_detail(loanID)
-    except:
-        pass
+    # try:
+    bNewThumbnail = get_thumbnail(loanID)
+    bNewDetail    = get_detail(loanID)
+        
+    if (bNewThumbnail or bNewDetail) and nDelayBetweenLoanIDs > 0:
+        time.sleep(nDelayBetweenLoanIDs)
+    # except:
+        # pass
 
